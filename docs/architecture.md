@@ -2,7 +2,8 @@
 
 ```mermaid
 flowchart LR
-  Client["Cliente HTTP"] --> Security["Spring Security: sessão, CSRF e RBAC"]
+  Client["Browser · React"] --> Proxy["Nginx · UI e proxy na mesma origem"]
+  Proxy --> Security["Spring Security: sessão, CSRF e RBAC"]
   Security --> REST["Controllers REST e DTOs"]
   REST --> UseCases["Serviços transacionais"]
   UseCases --> Domain["Ticket e política de SLA"]

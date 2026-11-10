@@ -2,17 +2,32 @@
 
 ## Português
 
-SupportHub é uma API de help desk corporativo. A milestone **v0.1.0 — Backend Foundation** cobre o fluxo da abertura ao fechamento de um ticket, com autorização por papel e solicitante, SLA e histórico transacional. O caso crítico é a disputa pelo mesmo ticket: dois agentes fazem a tentativa, um assume e o outro recebe HTTP 409.
+SupportHub é uma central de atendimento corporativo com API Spring Boot e interface React. A **v0.1.0 — Backend Foundation** é a release estável. A **v0.2.0 — Full Stack Experience** está em desenvolvimento como `0.2.0-dev`.
 
-### Stack e arquitetura
+![Fila de atendimento do SupportHub](docs/screenshots/05-fila-agente.png)
 
-Java 21, Spring Boot 3.5, Spring MVC e Security, JPA/Hibernate, PostgreSQL 17, Flyway, OpenAPI, JUnit, Testcontainers, Maven Wrapper, Docker Compose e GitHub Actions. O monólito modular separa `auth`, `user`, `ticket`, `comment`, `sla`, `audit` e `shared`. O PostgreSQL guarda os dados operacionais e o histórico. A aplicação usa Flyway para migrar o schema e Hibernate para validá-lo.
+### Espaços de trabalho
 
-- **CUSTOMER** abre tickets com prioridade inicial `MEDIUM`, vê e comenta apenas os próprios e pode reabrir um ticket resolvido. As consultas de propriedade incluem a referência e o ID do solicitante.
-- **AGENT** vê a fila inteira, assume um ticket livre, comenta publicamente ou em nota interna e altera prioridade e status dos tickets atribuídos a ele.
-- **ADMIN** opera a fila, atribui, reatribui e remove agentes e administra a ativação de clientes e agentes. A máquina de estados vale para todos. Apenas contas `AGENT` recebem atribuições.
+| Papel | Operações |
+| --- | --- |
+| **CUSTOMER** | Cadastro, sessão, abertura de ticket com prioridade inicial média, filtros, comentários públicos, SLA e reabertura quando permitida |
+| **AGENT** | Fila com filtros operacionais, claim, respostas públicas, notas internas, mudanças de status e prioridade para o responsável, resolução e histórico |
+| **ADMIN** | Fila e histórico de suporte, criação de agentes, ativação e desativação de contas, atribuição, reatribuição e remoção de responsável |
 
-`OPEN → IN_PROGRESS ↔ WAITING_CUSTOMER`. De `IN_PROGRESS` ou `WAITING_CUSTOMER`, o suporte pode resolver. De `RESOLVED`, o suporte pode fechar ou reabrir, e o solicitante pode reabrir por ação explícita. `CLOSED` é terminal. [Arquitetura, diagramas e regras](docs/architecture.md)
+O Spring valida os papéis, o solicitante e cada transição. Um ticket começa em `OPEN`, entra em `IN_PROGRESS`, pode aguardar em `WAITING_CUSTOMER` e chegar a `RESOLVED`. Um ticket resolvido pode ser reaberto ou encerrado. `CLOSED` é terminal.
+
+### Arquitetura e garantias
+
+```mermaid
+flowchart LR
+    B["Browser · React"] -->|mesma origem| N["Nginx · UI e proxy"]
+    N -->|API| S["Spring Boot · sessão e domínio"]
+    S --> P[("PostgreSQL · tickets e auditoria")]
+```
+
+Java 21, Spring Boot 3.5.16, Spring Security, Hibernate, Flyway, PostgreSQL 17, OpenAPI e Testcontainers. A UI usa React 19, TypeScript, Vite, React Router, TanStack Query, React Hook Form e Zod. O CSS usa tokens próprios para os temas claro e escuro.
+
+O navegador envia o cookie de sessão `HttpOnly` e `SameSite=Lax`. A aplicação pede um token CSRF para cada mutação. O Spring renova a sessão no login e revoga sessões anteriores ao desativar uma conta. A preferência de tema é o único dado persistido pela UI no armazenamento local.
 
 | Prioridade na abertura | Primeira resposta | Resolução |
 | --- | ---: | ---: |
@@ -21,55 +36,57 @@ Java 21, Spring Boot 3.5, Spring MVC e Security, JPA/Hibernate, PostgreSQL 17, F
 | HIGH | 4 h | 24 h |
 | URGENT | 1 h | 8 h |
 
-A política usa horas corridas UTC e guarda os prazos originais. A primeira resposta é o primeiro comentário público de suporte. Espera pelo cliente e reabertura consomem o prazo original de resolução. O status do SLA é calculado com um `Clock` e os timestamps persistidos. Nesta milestone, a criação sempre usa `MEDIUM`. As demais faixas estão definidas e testadas para futuras políticas de abertura.
+O servidor persiste os prazos originais em horas corridas. Mudanças de prioridade e espera pelo cliente preservam esses prazos. O primeiro comentário público do suporte marca a primeira resposta. A interface exibe os resultados e horários da API.
 
-### Executar
+O PostgreSQL serializa o claim pelo lock do ticket. Dois agentes concorrentes produzem um HTTP 200, um HTTP 409, uma atribuição e um evento `ASSIGNED`. A interface atualiza a atribuição após conflito. O histórico e a mudança do ticket compartilham a mesma transação.
 
-Requer Docker com Compose v2. Copie `.env.example` para `.env` e escolha senhas locais. Em PowerShell:
+### Executar localmente
+
+Requer Docker com Compose v2. Copie `.env.example` para `.env` e configure a senha do banco e as credenciais de bootstrap do administrador.
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build --wait
 ```
 
-A API responde em `http://127.0.0.1:8080`. Consulte [Swagger UI](http://127.0.0.1:8080/swagger-ui/index.html), [OpenAPI JSON](http://127.0.0.1:8080/v3/api-docs) e [readiness](http://127.0.0.1:8080/actuator/health/readiness). O banco usa volume persistente e rede privada do Compose. `docker compose down` encerra os serviços e preserva o volume.
+Acesse [SupportHub](http://127.0.0.1:8080), [Swagger UI](http://127.0.0.1:8080/swagger-ui/index.html), [OpenAPI JSON](http://127.0.0.1:8080/v3/api-docs) ou [readiness](http://127.0.0.1:8080/actuator/health/readiness). A porta pode ser configurada com `WEB_PORT`. Nginx publica a interface e o proxy em loopback. O PostgreSQL usa volume persistente e a API permanece na rede privada do Compose. `docker compose down` preserva o volume.
 
-Para execução direta com um PostgreSQL 17 acessível, configure `DB_URL`, `DB_USER` e `DB_PASSWORD`, selecione um JDK 21 e execute `./mvnw.cmd spring-boot:run` no Windows ou `./mvnw spring-boot:run` em Linux. Em HTTP local, defina `SESSION_COOKIE_SECURE=false` no ambiente do processo. Em HTTPS, mantenha o padrão seguro da aplicação. O bootstrap usa `ADMIN_EMAIL` e `ADMIN_PASSWORD`. Com ambas ausentes, a aplicação inicia sem criar administrador. A senha de bootstrap de uma conta existente permanece a mesma em reinícios.
+Para iterar na UI com Node 24 ou 26, execute `npm ci` e `npm run dev` em `frontend/`. O proxy Vite usa `http://127.0.0.1:8080` por padrão. Ajuste `SUPPORTHUB_API_ORIGIN` quando a API ou o Compose usar outra porta. Em HTTPS, use `SESSION_COOKIE_SECURE=true`. O modo HTTP local do Compose usa `false`.
 
-### API e testes
+### Testes e CI
 
-1. Busque `GET /api/v1/auth/csrf` e preserve o cookie `JSESSIONID`.
-2. Envie o token retornado no cabeçalho `X-CSRF-TOKEN` ao registrar ou autenticar. Login usa JSON com `email` e `password`.
-3. Busque um novo token após o login e use o mesmo cookie e o token nas mutações, inclusive no logout. Confira a identidade em `GET /api/v1/auth/me`.
+- Com JDK 21 e Docker, execute `./mvnw.cmd -B -ntp clean verify` no Windows ou `./mvnw -B -ntp clean verify` no Linux.
+- Em `frontend/`, execute `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build` e `npm audit --audit-level=moderate`.
+- No Windows, instale Chromium com `npm exec -- playwright install chromium` em `frontend/` e rode `pwsh -NoProfile -File scripts/fullstack-check.ps1` na raiz. O script cria uma stack descartável e executa smoke e E2E. Para outra stack descartável, forneça `SUPPORTHUB_BASE_URL`, `ADMIN_EMAIL` e `ADMIN_PASSWORD` e execute `npm run e2e` em `frontend/`.
+- A CI executa regressão do backend, validação do frontend e Playwright com axe-core sobre Compose. Ela guarda os relatórios XML.
 
-As rotas de cliente ficam em `/api/v1/tickets`, as de suporte em `/api/v1/agent/tickets`, e as administrativas em `/api/v1/admin`. As listagens aceitam `page` a partir de 0 e `size` de 1 a 100. Consulte o [contrato de API](docs/architecture.md#api) para filtros e erros.
+### Documentação e próximos passos
 
-Execute `./mvnw.cmd -B -ntp clean verify` no Windows ou `./mvnw -B -ntp clean verify` em Linux, com JDK 21 e Docker ativos. A suíte de integração sobe um PostgreSQL descartável e faz chamadas HTTP reais. Os relatórios ficam em `target/surefire-reports` e `target/failsafe-reports`. Para o smoke do Compose, disponibilize as mesmas credenciais de bootstrap no processo PowerShell e execute `./scripts/smoke.ps1`. A CI executa o build, os testes e o smoke em stack nova e guarda os relatórios.
+[Galeria de screenshots](docs/screenshots/README.md) · [Auditoria full-stack](docs/fullstack-audit.md) · [Arquitetura e API](docs/architecture.md) · [ADRs](docs/adr/) · [Trilha de estudo](docs/learning/README.md)
 
-### Roadmap
-
-A v0.1.0 usa sessões locais em uma instância, SLA em horas corridas e fila única. A futura **v0.2.0 — Full Stack Experience** poderá usar React, TypeScript e Vite, com TanStack Query, React Hook Form e Zod. Notificações podem ser avaliadas em uma milestone posterior.
-
-- [Auditoria e evidências](docs/backend-audit.md)
-- [Arquitetura e contrato de API](docs/architecture.md)
-- [Decisões arquiteturais](docs/adr/)
-- [Trilha de estudo](docs/learning/README.md), [guia de entrevista](docs/learning/interview-guide.md) e [exercícios](docs/learning/exercises.md)
+A linha do tempo do cliente contém os marcos públicos do ticket. O histórico de auditoria completo fica na área de suporte. A implantação inicial usa uma instância Spring com sessões em memória, uma fila e SLA em horas corridas. O escopo atual do roadmap é concluir a revisão da Full Stack Experience.
 
 The complete English version follows below.
 
 ## English
 
-SupportHub is a corporate help desk API. The **v0.1.0 — Backend Foundation** milestone covers tickets from creation to closure, with role and requester authorization, SLA tracking and transactional history. The critical scenario is two agents claiming the same ticket. One claim succeeds and the other returns HTTP 409.
+SupportHub is a corporate help desk with a Spring Boot API and React UI. **v0.1.0 — Backend Foundation** is the stable release. **v0.2.0 — Full Stack Experience** is under development as `0.2.0-dev`.
 
-### Stack and architecture
+### Workspaces
 
-Java 21, Spring Boot 3.5, Spring MVC and Security, JPA/Hibernate, PostgreSQL 17, Flyway, OpenAPI, JUnit, Testcontainers, Maven Wrapper, Docker Compose and GitHub Actions. The modular monolith separates `auth`, `user`, `ticket`, `comment`, `sla`, `audit` and `shared`. PostgreSQL stores operational data and history. Flyway migrates the schema and Hibernate validates it.
+| Role | Operations |
+| --- | --- |
+| **CUSTOMER** | Registration, session, ticket creation at medium priority, filters, public comments, SLA tracking and reopening when allowed |
+| **AGENT** | Filterable queue, claim, public replies, internal notes, status and priority changes for the assigned agent, resolution and history |
+| **ADMIN** | Support queue and history, agent creation, account activation and deactivation, assignment, reassignment and removal |
 
-- **CUSTOMER** opens `MEDIUM` tickets, reads and comments on their own tickets, and can reopen a resolved ticket. Ownership queries include both the reference and the requester ID.
-- **AGENT** sees the entire queue, claims an unassigned ticket, posts public and internal comments, and changes status and priority on tickets assigned to them.
-- **ADMIN** operates the queue, assigns, reassigns or removes agents, and manages customer and agent activation. The same state machine applies to every role. Only `AGENT` accounts can receive assignments.
+Spring enforces roles, requester ownership and transitions. A ticket starts at `OPEN`, moves to `IN_PROGRESS`, can wait in `WAITING_CUSTOMER`, and can reach `RESOLVED`. Resolved tickets can reopen or close. `CLOSED` is terminal.
 
-`OPEN → IN_PROGRESS ↔ WAITING_CUSTOMER`. Staff can resolve a ticket from `IN_PROGRESS` or `WAITING_CUSTOMER`. From `RESOLVED`, staff can close or reopen it, and the requester can reopen it through an explicit action. `CLOSED` is terminal. [Architecture, diagrams and domain rules](docs/architecture.md)
+### Architecture and guarantees
+
+Nginx serves React and proxies the Spring API on the same browser origin. Spring stores tickets and audit history in PostgreSQL. The stack includes Java 21, Spring Boot 3.5.16, Spring Security, Hibernate, Flyway, PostgreSQL 17, OpenAPI and Testcontainers. The UI uses React 19, TypeScript, Vite, React Router, TanStack Query, React Hook Form, Zod and custom light and dark theme tokens.
+
+The browser sends an `HttpOnly`, `SameSite=Lax` session cookie. The client requests a CSRF token for each mutation. Spring rotates the session on login and revokes older sessions after account deactivation. The theme preference is the only data the UI persists in local storage.
 
 | Opening priority | First response | Resolution |
 | --- | ---: | ---: |
@@ -78,38 +95,34 @@ Java 21, Spring Boot 3.5, Spring MVC and Security, JPA/Hibernate, PostgreSQL 17,
 | HIGH | 4 h | 24 h |
 | URGENT | 1 h | 8 h |
 
-The policy uses UTC calendar hours and stores the original deadlines. The first public staff comment counts as the first response. Waiting for the customer and reopening both consume the original resolution deadline. The API derives the SLA outcome from an injected `Clock` and persisted timestamps. Ticket creation currently starts at `MEDIUM`. The other policy tiers are defined and tested for future opening policies.
+The server stores original calendar-hour deadlines. Changes in priority and time spent waiting for the customer preserve those deadlines. The first public support comment records the first response. The UI displays the outcomes and times returned by the API.
+
+PostgreSQL serializes claims using the ticket row lock. Two competing agents produce one HTTP 200, one HTTP 409, one assignment and one `ASSIGNED` event. The UI refreshes assignment after a conflict. Ticket changes and audit records share a transaction.
 
 ### Run locally
 
-Docker with Compose v2 is required. Copy `.env.example` to `.env` and choose local passwords. In PowerShell:
+With Docker and Compose v2, copy `.env.example` to `.env` and configure the database password and administrator bootstrap credentials.
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build --wait
 ```
 
-The API listens on `http://127.0.0.1:8080`. See [Swagger UI](http://127.0.0.1:8080/swagger-ui/index.html), [OpenAPI JSON](http://127.0.0.1:8080/v3/api-docs) and [readiness](http://127.0.0.1:8080/actuator/health/readiness). The database uses a persistent volume and a private Compose network. `docker compose down` stops the services and preserves the volume.
+Open [SupportHub](http://127.0.0.1:8080), [Swagger UI](http://127.0.0.1:8080/swagger-ui/index.html), [OpenAPI JSON](http://127.0.0.1:8080/v3/api-docs), or [readiness](http://127.0.0.1:8080/actuator/health/readiness). Change the port with `WEB_PORT`. Nginx publishes the UI and proxy on loopback. PostgreSQL uses a persistent volume and the API stays on the private Compose network. `docker compose down` preserves the volume.
 
-To run directly against a reachable PostgreSQL 17 instance, set `DB_URL`, `DB_USER` and `DB_PASSWORD`, select a Java 21 JDK and run `./mvnw.cmd spring-boot:run` on Windows or `./mvnw spring-boot:run` on Linux. Set `SESSION_COOKIE_SECURE=false` in the process environment for local HTTP. Keep the application default for HTTPS. Bootstrap uses `ADMIN_EMAIL` and `ADMIN_PASSWORD`. With both absent, startup creates no administrator. Restarting with an existing administrator leaves its password intact.
+For frontend development with Node 24 or 26, run `npm ci` and `npm run dev` in `frontend/`. The Vite proxy defaults to `http://127.0.0.1:8080`. Set `SUPPORTHUB_API_ORIGIN` for a different API or Compose port. Use `SESSION_COOKIE_SECURE=true` with HTTPS. The local HTTP Compose profile uses `false`.
 
-### API and tests
+### Testing and CI
 
-1. Fetch `GET /api/v1/auth/csrf` and keep the `JSESSIONID` cookie.
-2. Send the returned token in the `X-CSRF-TOKEN` header when registering or signing in. Login takes JSON with `email` and `password`.
-3. Fetch a fresh token after login and send it with the same cookie on mutations, including logout. Check the current identity at `GET /api/v1/auth/me`.
+- With JDK 21 and Docker, run `./mvnw.cmd -B -ntp clean verify` on Windows or `./mvnw -B -ntp clean verify` on Linux.
+- In `frontend/`, run `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, and `npm audit --audit-level=moderate`.
+- On Windows, install Chromium with `npm exec -- playwright install chromium` in `frontend/` and run `pwsh -NoProfile -File scripts/fullstack-check.ps1` from the repository root. The script creates a disposable stack and runs smoke and E2E tests. For another disposable stack, set `SUPPORTHUB_BASE_URL`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`, then run `npm run e2e` in `frontend/`.
+- CI runs backend regression, frontend checks and Playwright with axe-core on Compose. It retains the XML reports.
 
-Customer routes live under `/api/v1/tickets`, support routes under `/api/v1/agent/tickets`, and administrative routes under `/api/v1/admin`. List endpoints accept zero-based `page` and `size` between 1 and 100. See the [API contract](docs/architecture.md#api) for filters and errors.
+### Documentation and roadmap
 
-Run `./mvnw.cmd -B -ntp clean verify` on Windows or `./mvnw -B -ntp clean verify` on Linux with a Java 21 JDK and Docker. Integration tests start disposable PostgreSQL and use real HTTP requests. Reports are stored in `target/surefire-reports` and `target/failsafe-reports`. To smoke-test Compose, set the matching bootstrap credentials in your PowerShell process and run `./scripts/smoke.ps1`. CI builds, runs the tests and smoke-tests a fresh stack. It retains the test reports.
+[Screenshot gallery](docs/screenshots/README.md) · [Full-stack audit](docs/fullstack-audit.md) · [Architecture and API](docs/architecture.md) · [ADRs](docs/adr/) · [Learning track](docs/learning/README.md)
 
-### Roadmap
-
-v0.1.0 uses in-memory sessions on a single instance, calendar-hour SLAs and one support queue. The future **v0.2.0 — Full Stack Experience** may use React, TypeScript and Vite, with TanStack Query, React Hook Form and Zod. Notifications are a possible later milestone.
-
-- [Audit and verification evidence](docs/backend-audit.md)
-- [Architecture and API contract](docs/architecture.md)
-- [Architecture decisions](docs/adr/)
-- [Learning track](docs/learning/README.md), [interview guide](docs/learning/interview-guide.md) and [exercises](docs/learning/exercises.md) in Portuguese
+The customer timeline shows the public milestones of a ticket. The complete audit history belongs to the staff workspace. The initial deployment uses one Spring instance with in-memory sessions, one queue and calendar-hour SLAs. The current roadmap focuses on reviewing the Full Stack Experience.
 
 [MIT License](LICENSE)
