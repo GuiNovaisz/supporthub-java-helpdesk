@@ -1,4 +1,4 @@
-name: Backend CI
+name: SupportHub CI
 
 on:
   push:
@@ -40,19 +40,40 @@ jobs:
   container:
     name: Container
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Build image and smoke-test a fresh Compose stack
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Playwright and Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npm exec -- playwright install --with-deps chromium
+      - name: Build, smoke-test and exercise a fresh Compose stack in Chromium
         shell: bash
         run: |
           export DB_PASSWORD="$(openssl rand -hex 20)"
           export ADMIN_EMAIL=admin@example.test
           export ADMIN_PASSWORD="$(openssl rand -hex 20)"
-          export API_PORT=0
+          echo "::add-mask::$DB_PASSWORD"
+          echo "::add-mask::$ADMIN_PASSWORD"
+          export WEB_PORT=0
           docker compose -p supporthub-ci up --build --wait --wait-timeout 180
-          binding="$(docker compose -p supporthub-ci port api 8080)"
-          pwsh -NoProfile -File scripts/smoke.ps1 -BaseUri "http://$binding"
+          binding="$(docker compose -p supporthub-ci port web 8080)"
+          export SUPPORTHUB_BASE_URL="http://$binding"
+          pwsh -NoProfile -File scripts/smoke.ps1 -BaseUri "$SUPPORTHUB_BASE_URL"
+          npm --prefix frontend run e2e
+      - name: Upload Playwright results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fullstack-e2e-results
+          path: frontend/test-results/e2e.xml
+          retention-days: 14
       - name: Show logs on failure
         if: failure()
         env:
@@ -63,6 +84,28 @@ jobs:
         env:
           DB_PASSWORD: unused-for-cleanup
         run: docker compose -p supporthub-ci down --volumes
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=moderate
 
   dependency-review:
     name: Dependency Review
