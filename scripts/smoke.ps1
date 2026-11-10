@@ -10,23 +10,30 @@ $ErrorActionPreference = 'Stop'
 if (!$AdminEmail -or !$AdminPassword) { throw 'Set ADMIN_EMAIL and ADMIN_PASSWORD for the test administrator.' }
 
 function New-SmokeSession {
-    return @{ Cookies = [Microsoft.PowerShell.Commands.WebRequestSession]::new(); Headers = @{} }
+    return @{ Cookies = $null; Headers = @{} }
 }
 
 function Invoke-SmokeRequest($Session, [string]$Method, [string]$Path, [int]$Expected, $Payload) {
     $options = @{
         Uri = [uri]::new($BaseUri, $Path)
         Method = $Method
-        WebSession = $Session.Cookies
         Headers = $Session.Headers
         SkipHttpErrorCheck = $true
         TimeoutSec = 20
+    }
+    if ($null -eq $Session.Cookies) {
+        $options.SessionVariable = 'cookieSession'
+    } else {
+        $options.WebSession = $Session.Cookies
     }
     if ($null -ne $Payload) {
         $options.ContentType = 'application/json'
         $options.Body = ConvertTo-Json -InputObject $Payload -Compress
     }
     $result = Invoke-WebRequest @options
+    if ($null -eq $Session.Cookies) {
+        $Session.Cookies = $cookieSession
+    }
     if ($result.StatusCode -ne $Expected) {
         throw "$Method $Path returned $($result.StatusCode), expected $Expected."
     }

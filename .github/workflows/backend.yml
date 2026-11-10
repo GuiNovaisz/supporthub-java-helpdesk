@@ -49,8 +49,10 @@ jobs:
           export DB_PASSWORD="$(openssl rand -hex 20)"
           export ADMIN_EMAIL=admin@example.test
           export ADMIN_PASSWORD="$(openssl rand -hex 20)"
+          export API_PORT=0
           docker compose -p supporthub-ci up --build --wait --wait-timeout 180
-          pwsh -NoProfile -File scripts/smoke.ps1
+          binding="$(docker compose -p supporthub-ci port api 8080)"
+          pwsh -NoProfile -File scripts/smoke.ps1 -BaseUri "http://$binding"
       - name: Show logs on failure
         if: failure()
         env:
