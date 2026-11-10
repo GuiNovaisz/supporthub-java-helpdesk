@@ -48,7 +48,7 @@ management:
 info:
   app:
     name: SupportHub
-    milestone: Backend Foundation
+    milestone: Full Stack Experience
 
 logging:
   structured:
