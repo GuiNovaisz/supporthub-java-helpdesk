@@ -25,6 +25,18 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
+      - name: Bootstrap Maven Wrapper
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if ./mvnw -B -ntp --version; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              sleep 5
+            fi
+          done
+          exit 1
       - name: Run unit and PostgreSQL integration tests
         run: ./mvnw -B -ntp clean verify
       - name: Upload test reports

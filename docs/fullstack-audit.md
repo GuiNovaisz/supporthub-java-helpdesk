@@ -64,3 +64,5 @@ A revisão corrigiu a quebra do cabeçalho Permissions-Policy causada pelo forma
 A auditoria final repetiu os 24 testes backend, 10 testes frontend e quatro E2E com zero falhas, erros, skips ou retries. O PR #7 integrou a feature em dev por merge commit. A promoção para main executa os quatro jobs da CI e a publicação exige nova validação do SHA pós-merge. O histórico de CI está disponível no workflow do repositório. As versões de dependências permanecem as da implementação revisada.
 
 Dependency Review aprovou a introdução do frontend e emitiu avisos de OpenSSF Scorecard para algumas dependências transitivas. Esses indicadores de manutenção ficam como acompanhamento Optional. O npm audit validou zero vulnerabilidades na árvore instalada.
+
+Dois runners falharam ao baixar o Maven antes da compilação. A CI passou a limitar a três tentativas o bootstrap do Wrapper, mantendo sua verificação de checksum. O comando clean verify continua sendo executado uma única vez.
