@@ -23,6 +23,7 @@ Filtros, ordenação e páginas usam os parâmetros da API. O cliente recebe uma
 - As chaves de query de dados incluem a identidade. O cache de dados autenticados é descartado em login, logout e sessão expirada. A única gravação persistente do frontend é a preferência de tema.
 - O Nginx entrega CSP para o app, proteção contra enquadramento, `nosniff`, política de referência e de permissões. O HTML usa `no-store`. A API continua usando os cabeçalhos Spring. O Swagger permanece acessível pelo proxy.
 - A auditoria usa volumes e credenciais descartáveis. O navegador roda em contexto isolado. O E2E conserva apenas o relatório JUnit na CI. A galeria usa contas sintéticas e telas sem campos de senha preenchidos.
+- A auditoria de publicação reforçou o E2E de notas internas. O payload de comentários recebido pelo CUSTOMER contém apenas PUBLIC, com contagem pública e sem o corpo da nota. Após logout do agente e login do cliente na mesma SPA, a conversa e a linha do tempo também permanecem sem a nota interna, exercitando a limpeza do cache por identidade.
 
 ## SLA e concorrência
 

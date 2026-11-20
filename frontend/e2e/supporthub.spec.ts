@@ -231,7 +231,8 @@ test('agent operates a ticket, public reply records SLA and internal note stays 
     await apiLogin(provision.request, admin)
     const agent = person('Rafael Almeida')
     await createAgent(provision.request, agent)
-    await register(customer.request, person('Helena Nunes'))
+    const customerCredentials = person('Helena Nunes')
+    await register(customer.request, customerCredentials)
     const title = 'Falha no painel de relatórios'
     const { reference } = await createTicket(customer.request, title)
     await login(page, agent)
@@ -284,7 +285,19 @@ test('agent operates a ticket, public reply records SLA and internal note stays 
     await expect(page.getByRole('heading', { name: 'Esta área não está disponível' })).toBeVisible()
     expect((await page.request.get(api + '/admin/users')).status()).toBe(403)
     const customerPage = await customer.newPage()
+    const commentsResponse = customerPage.waitForResponse((response) =>
+      response.url().includes('/tickets/' + reference + '/comments?'),
+    )
     await customerPage.goto('/tickets/' + reference)
+    const publicComments = await (await commentsResponse).json()
+    expect(publicComments.totalElements).toBe(1)
+    expect(
+      publicComments.items.map((comment: { visibility: string }) => comment.visibility),
+    ).toEqual(['PUBLIC'])
+    expect(JSON.stringify(publicComments)).not.toContain(
+      'Conferir permissões do grupo de relatórios.',
+    )
+    expect(JSON.stringify(publicComments)).not.toContain('INTERNAL')
     await expect(
       customerPage.getByText('Estamos verificando seu acesso aos relatórios.'),
     ).toBeVisible()
@@ -292,6 +305,21 @@ test('agent operates a ticket, public reply records SLA and internal note stays 
       0,
     )
     await expect(customerPage.getByText('Nota interna')).toHaveCount(0)
+    await expect(customerPage.getByRole('heading', { name: 'Linha do tempo' })).toBeVisible()
+
+    // Switch identities without reloading this SPA, after it cached staff notes and history.
+    await page.getByRole('button', { name: 'Sair' }).click()
+    await expect(page.getByRole('heading', { name: 'Entre no SupportHub' })).toBeVisible()
+    await page.getByLabel('E-mail').fill(customerCredentials.email)
+    await page.getByLabel('Senha', { exact: true }).fill(customerCredentials.password)
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click()
+    const customerLink = page.getByRole('link', { name: new RegExp(title) })
+    await expect(customerLink).toBeVisible()
+    await customerLink.click()
+    await expect(page.getByText('Estamos verificando seu acesso aos relatórios.')).toBeVisible()
+    await expect(page.getByText('Conferir permissões do grupo de relatórios.')).toHaveCount(0)
+    await expect(page.getByText('Nota interna')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Histórico', exact: true })).toHaveCount(0)
     await customerPage.getByRole('button', { name: 'Reabrir ticket' }).click()
     await expect(customerPage.getByText('Em atendimento', { exact: true })).toBeVisible()
     await expect(customerPage.getByText('Primeira resposta pública', { exact: true })).toBeVisible()
