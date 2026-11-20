@@ -2,7 +2,7 @@
 
 ## Versão e escopo
 
-`feature/fullstack-experience` parte do commit `1730d42848fa0623451abfdaafc527150157497b` de `dev`, publicado como v0.1.0. Maven e npm identificam a feature como `0.2.0-dev`. As alterações Spring limitam-se aos metadados de versão e milestone. Java 21, Spring Boot 3.5.16, Spring Security 6.5, PostgreSQL 17 e o contrato HTTP foram preservados.
+`feature/fullstack-experience` parte do commit `1730d42848fa0623451abfdaafc527150157497b` de `dev`, publicado como v0.1.0. Durante o desenvolvimento, Maven e npm usaram a versão 0.2.0-dev. A preparação de publicação define ambos como 0.2.0. As alterações Spring limitam-se aos metadados de versão e milestone. Java 21, Spring Boot 3.5.16, Spring Security 6.5, PostgreSQL 17 e o contrato HTTP foram preservados.
 
 ## Arquitetura e papéis
 
@@ -57,3 +57,10 @@ A revisão corrigiu a quebra do cabeçalho Permissions-Policy causada pelo forma
 - **Critical** — Nenhum em aberto.
 - **Important** — Nenhum em aberto.
 - **Optional** — A implantação inicial usa sessão em memória, fila única e SLA em horas corridas. A baseline continua deixando sessões compartilhadas, horários úteis, limitação de login na borda e maior isolamento DDL para uma etapa posterior.
+
+
+## Publicação v0.2.0
+
+A auditoria final repetiu os 24 testes backend, 10 testes frontend e quatro E2E com zero falhas, erros, skips ou retries. O PR #7 integrou a feature em dev por merge commit. A promoção para main executa os quatro jobs da CI e a publicação exige nova validação do SHA pós-merge. O histórico de CI está disponível no workflow do repositório. As versões de dependências permanecem as da implementação revisada.
+
+Dependency Review aprovou a introdução do frontend e emitiu avisos de OpenSSF Scorecard para algumas dependências transitivas. Esses indicadores de manutenção ficam como acompanhamento Optional. O npm audit validou zero vulnerabilidades na árvore instalada.

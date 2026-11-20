@@ -2,7 +2,7 @@
 
 ## Português
 
-SupportHub é uma central de atendimento corporativo com API Spring Boot e interface React. A **v0.1.0 — Backend Foundation** é a release estável. A **v0.2.0 — Full Stack Experience** está em desenvolvimento como `0.2.0-dev`.
+SupportHub é uma central de atendimento corporativo com API Spring Boot e interface React. A **v0.2.0 — Full Stack Experience** reúne a interface web e a Backend Foundation na release estável 0.2.0. A v0.1.0 permanece como marco histórico da API.
 
 ![Fila de atendimento do SupportHub](docs/screenshots/05-fila-agente.png)
 
@@ -64,13 +64,13 @@ Para iterar na UI com Node 24 ou 26, execute `npm ci` e `npm run dev` em `fronte
 
 [Galeria de screenshots](docs/screenshots/README.md) · [Auditoria full-stack](docs/fullstack-audit.md) · [Arquitetura e API](docs/architecture.md) · [ADRs](docs/adr/) · [Trilha de estudo](docs/learning/README.md)
 
-A linha do tempo do cliente contém os marcos públicos do ticket. O histórico de auditoria completo fica na área de suporte. A implantação inicial usa uma instância Spring com sessões em memória, uma fila e SLA em horas corridas. O escopo atual do roadmap é concluir a revisão da Full Stack Experience.
+A linha do tempo do cliente contém os marcos públicos do ticket. O histórico de auditoria completo fica na área de suporte. A implantação inicial usa uma instância Spring com sessões em memória, uma fila e SLA em horas corridas. A Full Stack Experience conclui a v0.2.0. A próxima milestone será definida separadamente a partir das necessidades de uso.
 
 The complete English version follows below.
 
 ## English
 
-SupportHub is a corporate help desk with a Spring Boot API and React UI. **v0.1.0 — Backend Foundation** is the stable release. **v0.2.0 — Full Stack Experience** is under development as `0.2.0-dev`.
+SupportHub is a corporate help desk with a Spring Boot API and React UI. **v0.2.0 — Full Stack Experience** combines the web interface and the Backend Foundation in the stable 0.2.0 release. v0.1.0 remains the historical API milestone.
 
 ### Workspaces
 
@@ -123,6 +123,6 @@ For frontend development with Node 24 or 26, run `npm ci` and `npm run dev` in `
 
 [Screenshot gallery](docs/screenshots/README.md) · [Full-stack audit](docs/fullstack-audit.md) · [Architecture and API](docs/architecture.md) · [ADRs](docs/adr/) · [Learning track](docs/learning/README.md)
 
-The customer timeline shows the public milestones of a ticket. The complete audit history belongs to the staff workspace. The initial deployment uses one Spring instance with in-memory sessions, one queue and calendar-hour SLAs. The current roadmap focuses on reviewing the Full Stack Experience.
+The customer timeline shows the public milestones of a ticket. The complete audit history belongs to the staff workspace. The initial deployment uses one Spring instance with in-memory sessions, one queue and calendar-hour SLAs. The Full Stack Experience completes v0.2.0. The next milestone will be defined separately based on usage needs.
 
 [MIT License](LICENSE)
